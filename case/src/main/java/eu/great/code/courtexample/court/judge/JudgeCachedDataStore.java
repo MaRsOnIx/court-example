@@ -26,6 +26,11 @@ class JudgeCachedDataStore implements DataStoreReader<JudgeView, UUID>, DataStor
     }
 
     @Override
+    public boolean exists(UUID judgeUuid) {
+        return cached.containsKey(judgeUuid);
+    }
+
+    @Override
     public void save(JudgeView obj) {
         cached.put(obj.judgeUuid(), obj);
     }

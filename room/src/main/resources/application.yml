@@ -1,0 +1,22 @@
+#  logging:
+#    level:
+#      org:
+#        springframework: TRACE
+
+
+server:
+  error:
+    include-message: always
+spring:
+  datasource:
+    url: jdbc:h2:file:./databases/room
+  kafka:
+    producer:
+      bootstrap-servers: 127.0.0.1:9092
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+      transaction-id-prefix: tx-room-
+  jpa:
+    hibernate:
+      ddl-auto: update
+

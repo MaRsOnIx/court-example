@@ -8,7 +8,7 @@ import eu.great.code.courtexample.judge.command.UpdateJudgeCommand;
 import eu.great.code.courtexample.judge.event.JudgeUpdatedEvent;
 import eu.great.code.courtexample.judge.view.JudgeFunctionHistoryView;
 import eu.great.code.courtexample.judge.view.JudgeView;
-import eu.great.code.courtexample.reservation.Period;
+import eu.great.code.courtexample.reservation.PeriodDate;
 import eu.great.code.courtexample.reservation.command.BecomeAvailableAsDefaultCommand;
 import eu.great.code.courtexample.reservation.command.BecomeUnavailableAsDefaultCommand;
 import eu.great.code.courtexample.reservation.command.PeriodicallyReserveAvailabilityCommand;
@@ -134,23 +134,23 @@ class JudgeController {
                     latestFunction.endDate().atTime(23, 59, 59),
                     FUNCTION_CONTEXT)
             );
-
         }
+        kafkaTemplate.send(JUDGE_TOPIC, new JudgeUpdatedEvent(Instant.now(), judgeEntity.toView()));
     }
 
     @PostMapping("function")
     @Transactional
     public void assignFunctionToJudge(@RequestBody @Valid AssignFunctionToJudgeCommand command) {
 
-        Period period = Try.of(() -> Period.of(command.begginingDate(), command.endDate()))
+        PeriodDate periodDate = Try.of(() -> PeriodDate.of(command.begginingDate(), command.endDate()))
                 .getOrElseThrow(v -> new ResponseStatusException(HttpStatus.CONFLICT, v.getMessage()));
 
         JudgeEntity judgeEntity = findOrThrow(command.judgeUuid());
 
 
-        if (judgeEntity.periodIsNewerThanPeriodOfNewestFunction(period)) {
+        if (judgeEntity.periodIsNewerThanPeriodOfNewestFunction(periodDate)) {
 
-            judgeEntity.assignCurrentFunction(period, command.function(), new CurrentJudgeFunctionOverlappingPolicy())
+            judgeEntity.assignCurrentFunction(periodDate, command.function(), new CurrentJudgeFunctionOverlappingPolicy())
                     .getOrElseThrow(v -> new ResponseStatusException(HttpStatus.CONFLICT, v.message()));
 
             if (command.endDate() == null) {
@@ -169,11 +169,11 @@ class JudgeController {
                         FUNCTION_CONTEXT)
                 );
             }
-            kafkaTemplate.send(JUDGE_TOPIC, new JudgeUpdatedEvent(Instant.now(), judgeEntity.toView()));
         } else {
-            judgeEntity.assignHistoricalFunction(period, command.function(), new HistoricalJudgeFunctionOverlappingPolicy())
+            judgeEntity.assignHistoricalFunction(periodDate, command.function(), new HistoricalJudgeFunctionOverlappingPolicy())
                     .getOrElseThrow(v -> new ResponseStatusException(HttpStatus.CONFLICT, v.message()));
         }
+        kafkaTemplate.send(JUDGE_TOPIC, new JudgeUpdatedEvent(Instant.now(), judgeEntity.toView()));
 
     }
 

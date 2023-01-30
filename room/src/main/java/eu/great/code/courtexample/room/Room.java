@@ -4,6 +4,7 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.validation.constraints.NotEmpty;
 
 import java.util.UUID;
 
@@ -12,7 +13,9 @@ class Room {
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
     private UUID roomUuid;
+    @NotEmpty
     private String roomNumber;
+    @NotEmpty
     private int floor;
     private String description;
 

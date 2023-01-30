@@ -6,4 +6,5 @@ import java.util.Optional;
 public interface DataStoreReader<T, ID> {
     Optional<T> find(ID id);
     Collection<T> findAll();
+    boolean exists(ID judgeUuid);
 }

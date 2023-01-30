@@ -1,5 +1,6 @@
 package eu.great.code.courtexample;
 
+import eu.great.code.courtexample.reservation.PeriodDateTime;
 import jakarta.persistence.*;
 
 import java.time.Instant;
@@ -61,6 +62,19 @@ class Resource {
         return status == Status.AVAILABLE;
     }
 
+    boolean isAvailable(PeriodDateTime periodDateTime){
+        if(periods.isEmpty()){
+            return defaultStatus == Status.AVAILABLE;
+        }
+        Status status = periods.stream()
+                .filter(v -> v.isIncluding(periodDateTime))
+                .max(Comparator.comparing(Period::getCauseOccurred))
+                .map(Period::getStatus)
+                .orElse(defaultStatus);
+
+        return status == Status.AVAILABLE;
+    }
+
 
     private enum Status {
         AVAILABLE, UNAVAILABLE
@@ -87,6 +101,12 @@ class Resource {
         boolean isIncluding(LocalDateTime date) {
             return (date.isEqual(startDate) || date.isAfter(startDate)) && (date.isEqual(endDate) || date.isBefore(endDate));
         }
+
+        boolean isIncluding(PeriodDateTime date) {
+            return (date.getBeginningDate().isEqual(startDate) || date.getBeginningDate().isAfter(startDate)) &&
+                    (date.getEndDate().isEqual(endDate) || date.getEndDate().isBefore(endDate));
+        }
+
 
         Instant getCauseOccurred() {
             return causeOccurred;

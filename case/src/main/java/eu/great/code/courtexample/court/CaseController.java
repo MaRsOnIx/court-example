@@ -26,7 +26,11 @@ class CaseController {
     private final JudgeReaderService judgeReaderService;
     private final CaseNumberAutoCounter caseNumberAutoCounter;
 
-    CaseController(AssignedUpdater assignedUpdater, CaseRepository caseRepository, CourtRepository courtRepository, JudgeReaderService judgeReaderService, CaseNumberAutoCounter caseNumberAutoCounter) {
+    CaseController(AssignedUpdater assignedUpdater,
+                   CaseRepository caseRepository,
+                   CourtRepository courtRepository,
+                   JudgeReaderService judgeReaderService,
+                   CaseNumberAutoCounter caseNumberAutoCounter) {
         this.assignedUpdater = assignedUpdater;
         this.caseRepository = caseRepository;
         this.courtRepository = courtRepository;

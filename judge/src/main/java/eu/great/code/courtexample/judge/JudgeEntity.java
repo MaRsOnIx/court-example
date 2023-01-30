@@ -5,7 +5,7 @@ import eu.great.code.courtexample.Fullname;
 import eu.great.code.courtexample.judge.view.JudgeFunction;
 import eu.great.code.courtexample.judge.view.JudgeFunctionHistoryView;
 import eu.great.code.courtexample.judge.view.JudgeView;
-import eu.great.code.courtexample.reservation.Period;
+import eu.great.code.courtexample.reservation.PeriodDate;
 import io.vavr.control.Either;
 import io.vavr.control.Try;
 import jakarta.persistence.*;
@@ -41,7 +41,7 @@ class JudgeEntity {
     }
 
     static JudgeEntity create(Fullname fullname, JudgeFunction function, LocalDate beginningDate, LocalDate endDate) {
-        return new JudgeEntity(fullname, Set.of(new FunctionHistory(function, Period.of(beginningDate, endDate))));
+        return new JudgeEntity(fullname, Set.of(new FunctionHistory(function, PeriodDate.of(beginningDate, endDate))));
     }
 
     @PersistenceCreator
@@ -137,21 +137,21 @@ class JudgeEntity {
 //    }
 
 
-    Optional<FunctionHistory> findPreviousFunctionOfPeriod(Period period) {
+    Optional<FunctionHistory> findPreviousFunctionOfPeriod(PeriodDate periodDate) {
         return functionHistory.stream()
-                .filter(v -> v.getPeriod().getBeginningDate().isBefore(period.getBeginningDate()))
+                .filter(v -> v.getPeriod().getBeginningDate().isBefore(periodDate.getBeginningDate()))
                 .max(Comparator.comparing(v -> v.getPeriod().getBeginningDate()));
     }
 
-    private Optional<FunctionHistory> findNextFunctionOfPeriod(Period period) {
+    private Optional<FunctionHistory> findNextFunctionOfPeriod(PeriodDate periodDate) {
         return functionHistory.stream()
-                .filter(v -> v.getPeriod().getBeginningDate().isAfter(period.getEndDate() == null ? period.getBeginningDate() : period.getEndDate()))
+                .filter(v -> v.getPeriod().getBeginningDate().isAfter(periodDate.getEndDate() == null ? periodDate.getBeginningDate() : periodDate.getEndDate()))
                 .min(Comparator.comparing(v -> v.getPeriod().getBeginningDate()));
     }
 
-    boolean periodIsNewerThanPeriodOfNewestFunction(Period period) {
+    boolean periodIsNewerThanPeriodOfNewestFunction(PeriodDate periodDate) {
         return findPreviousFunction()
-                .filter(previousFunction -> previousFunction.getPeriod().getBeginningDate().isAfter(period.getBeginningDate()))
+                .filter(previousFunction -> previousFunction.getPeriod().getBeginningDate().isAfter(periodDate.getBeginningDate()))
                 .isEmpty();
     }
 
@@ -174,12 +174,12 @@ class JudgeEntity {
                 .toList();
     }
 
-    Either<Error, Void> assignCurrentFunction(Period period, JudgeFunction function, JudgeFunctionOverlappingPolicy overlappingPolicy) {
-        if (overlappingPolicy.anyFunctionPeriodOverlappingPeriod(findAllFunctions(), period)) {
-            return constructOverlappingError(period, overlappingPolicy);
+    Either<Error, Void> assignCurrentFunction(PeriodDate periodDate, JudgeFunction function, JudgeFunctionOverlappingPolicy overlappingPolicy) {
+        if (overlappingPolicy.anyFunctionPeriodOverlappingPeriod(findAllFunctions(), periodDate)) {
+            return constructOverlappingError(periodDate, overlappingPolicy);
         }
-        Optional<FunctionHistory> previousFunctionOfPeriod = findPreviousFunctionOfPeriod(period);
-        Optional<FunctionHistory> nextFunctionOfPeriod = findNextFunctionOfPeriod(period);
+        Optional<FunctionHistory> previousFunctionOfPeriod = findPreviousFunctionOfPeriod(periodDate);
+        Optional<FunctionHistory> nextFunctionOfPeriod = findNextFunctionOfPeriod(periodDate);
 
         if(nextFunctionOfPeriod.isPresent()){
             return Either.left(of("Przypisywana funkcja nie może zostać dodana jako obecna, ponieważ istnieje nowsza funkcja"));
@@ -191,23 +191,23 @@ class JudgeEntity {
                 return Either.left(of("Sędzia nie może pełnić pod rząd tej samej funkcji, poprzednia funkcja: (%s)".formatted(history.toView().toReadableString())));
             }else {
                 Try<FunctionHistory> functionHistories = Try.of(() -> history)
-                        .andThenTry(f -> f.updateEndDate(period.getBeginningDate().minusDays(1)))
+                        .andThenTry(f -> f.updateEndDate(periodDate.getBeginningDate().minusDays(1)))
                         .onSuccess(v -> logger.info("Funkcja o identyfikatorze %s została zaktualizowana (%s)".formatted(v.functionUuid, v.toView().toReadableString())));
                 if(functionHistories.isFailure()){
                     return Either.left(of(functionHistories.getCause().getMessage()));
                 }
             }
         }
-        functionHistory.add(new FunctionHistory(function, period));
+        functionHistory.add(new FunctionHistory(function, periodDate));
         return Either.right(null);
     }
 
-    Either<Error, Void> assignHistoricalFunction(Period period, JudgeFunction function, JudgeFunctionOverlappingPolicy overlappingPolicy) {
-        if (overlappingPolicy.anyFunctionPeriodOverlappingPeriod(findAllFunctions(), period)) {
-            return constructOverlappingError(period, overlappingPolicy);
+    Either<Error, Void> assignHistoricalFunction(PeriodDate periodDate, JudgeFunction function, JudgeFunctionOverlappingPolicy overlappingPolicy) {
+        if (overlappingPolicy.anyFunctionPeriodOverlappingPeriod(findAllFunctions(), periodDate)) {
+            return constructOverlappingError(periodDate, overlappingPolicy);
         }
-        Optional<FunctionHistory> previousFunctionOfPeriod = findPreviousFunctionOfPeriod(period);
-        Optional<FunctionHistory> nextFunctionOfPeriod = findNextFunctionOfPeriod(period);
+        Optional<FunctionHistory> previousFunctionOfPeriod = findPreviousFunctionOfPeriod(periodDate);
+        Optional<FunctionHistory> nextFunctionOfPeriod = findNextFunctionOfPeriod(periodDate);
 
         if(nextFunctionOfPeriod.isEmpty()){
             return Either.left(of("Przypisywana funkcja nie może zostać dodana jako historyczna, ponieważ nowsza funkcja nie istnieje"));
@@ -221,14 +221,14 @@ class JudgeEntity {
         if(nextFunctionOfPeriod.get().getFunction() == function){
             return Either.left(of("Sędzia nie może pełnić pod rząd tej samej funkcji, późniejsza funkcja: (%s)".formatted(nextFunctionOfPeriod.get().toView().toReadableString())));
         }
-        functionHistory.add(new FunctionHistory(function, period));
+        functionHistory.add(new FunctionHistory(function, periodDate));
         return Either.right(null);
     }
 
-    private Either<Error, Void> constructOverlappingError(Period period, JudgeFunctionOverlappingPolicy overlappingPolicy) {
-        return Either.left(of("W podanym okresie od " + period.getBeginningDate() + " do " + (period.getEndDate() == null ? "nieokreślona" : period.getEndDate()) +
+    private Either<Error, Void> constructOverlappingError(PeriodDate periodDate, JudgeFunctionOverlappingPolicy overlappingPolicy) {
+        return Either.left(of("W podanym okresie od " + periodDate.getBeginningDate() + " do " + (periodDate.getEndDate() == null ? "nieokreślona" : periodDate.getEndDate()) +
                 ", sędzia pełni już funkcję: (%s)".formatted(
-                        overlappingPolicy.getOverlappingFunctionHistoryByPeriod(findAllFunctions(), period).stream()
+                        overlappingPolicy.getOverlappingFunctionHistoryByPeriod(findAllFunctions(), periodDate).stream()
                                 .map(JudgeFunctionHistoryView::toReadableString)
                                 .collect(Collectors.joining(", ")))));
     }
@@ -242,11 +242,11 @@ class JudgeEntity {
         @Enumerated(EnumType.STRING)
         private JudgeFunction function;
         @Embedded
-        private Period period;
+        private PeriodDate periodDate;
 
-        private FunctionHistory(JudgeFunction function, Period period) {
+        private FunctionHistory(JudgeFunction function, PeriodDate periodDate) {
             this.function = function;
-            this.period = period;
+            this.periodDate = periodDate;
         }
 
         @PersistenceCreator
@@ -258,11 +258,11 @@ class JudgeEntity {
         }
 
         boolean endDateOfFunctionIsDetermined() {
-            return period.getEndDate() != null;
+            return periodDate.getEndDate() != null;
         }
 
-        Period getPeriod() {
-            return period;
+        PeriodDate getPeriod() {
+            return periodDate;
         }
 
         void updateFunction(JudgeFunction function) {
@@ -270,15 +270,15 @@ class JudgeEntity {
         }
 
         void updateEndDate(LocalDate endDate) {
-            this.period = Period.of(period.getBeginningDate(), endDate);
+            this.periodDate = PeriodDate.of(periodDate.getBeginningDate(), endDate);
         }
 
         void updatePeriod(LocalDate beginningDate, LocalDate endDate) {
-            this.period = Period.of(beginningDate, endDate);
+            this.periodDate = PeriodDate.of(beginningDate, endDate);
         }
 
         JudgeFunctionHistoryView toView() {
-            return new JudgeFunctionHistoryView(function, period);
+            return new JudgeFunctionHistoryView(function, periodDate);
         }
 
     }

@@ -1,18 +1,18 @@
 package eu.great.code.courtexample.judge.view;
 
 
-import eu.great.code.courtexample.reservation.Period;
+import eu.great.code.courtexample.reservation.PeriodDate;
 
 import java.time.LocalDate;
 
-public record JudgeFunctionHistoryView(JudgeFunction function, Period period) {
+public record JudgeFunctionHistoryView(JudgeFunction function, PeriodDate periodDate) {
 
     public LocalDate endDate(){
-        return period.getEndDate();
+        return periodDate.getEndDate();
     }
 
     public LocalDate beginningDate(){
-        return period.getBeginningDate();
+        return periodDate.getBeginningDate();
     }
 
     public boolean endDateOfFunctionIsDetermined(){
@@ -22,7 +22,7 @@ public record JudgeFunctionHistoryView(JudgeFunction function, Period period) {
     public String toReadableString() {
         return "funkcja: " + function.name() + ", okres(%s, %s)"
                 .formatted(
-                        period.getBeginningDate(),
-                        period.getEndDate() == null ? "nieokreślona" : period.getEndDate());
+                        periodDate.getBeginningDate(),
+                        periodDate.getEndDate() == null ? "nieokreślona" : periodDate.getEndDate());
     }
 }

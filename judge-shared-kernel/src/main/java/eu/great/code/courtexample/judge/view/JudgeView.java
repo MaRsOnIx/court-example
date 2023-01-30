@@ -15,7 +15,7 @@ public record JudgeView(
 
     public Optional<JudgeFunctionHistoryView> getCurrentFunction(){
         return functionHistory.stream()
-                .filter(v -> v.period().isBetween(LocalDate.now()))
+                .filter(v -> v.periodDate().isBetween(LocalDate.now()))
                 .findAny();
     }
 }
