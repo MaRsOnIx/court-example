@@ -65,9 +65,11 @@ public class JudgeReaderService {
 
     public boolean isActive(UUID judgeUuid){
         JudgeView foundJudge = judgeReader.find(judgeUuid)
-                .orElseThrow(() -> new NoSuchElementException("Judge does not exist"));
+                .orElseThrow(() -> new NoSuchElementException("Sędzia nie istnieje"));
         return foundJudge.active() &&
-                foundJudge.getCurrentFunction().map(f -> f.function() == JudgeFunction.REFERENDARZ).orElse(false) &&
+                foundJudge.getCurrentFunction()
+                        .filter(f -> f.function() == JudgeFunction.REFERENDARZ)
+                        .isPresent() &&
                 isAvailable(foundJudge) &&
                 assignedProvider.getAssignedCount(judgeUuid) < possibleAssignedCases;
     }
@@ -77,9 +79,9 @@ public class JudgeReaderService {
     }
 
     private boolean isAvailable(UUID resourceUuid, String context){
-        return Try.run(() -> resourceAvailabilityClient.checkAvailability(resourceUuid, context)).isSuccess();
+        return Try.run(
+                () -> resourceAvailabilityClient.checkAvailability(resourceUuid, context))
+                .isSuccess();
     }
-
-
 
 }

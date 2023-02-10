@@ -75,6 +75,13 @@ class Resource {
         return status == Status.AVAILABLE;
     }
 
+    UUID getResourceUUID() {
+        return resourceUUID;
+    }
+
+    String getContext() {
+        return context;
+    }
 
     private enum Status {
         AVAILABLE, UNAVAILABLE

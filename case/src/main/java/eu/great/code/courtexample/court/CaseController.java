@@ -79,7 +79,8 @@ class CaseController {
                 judgeUuid,
                 foundCourt,
                 caseNumberAutoCounter.incrementCounterAndGet(),
-                Symbol.fromText(command.symbol()).orElseThrow(() -> new ResponseStatusException(HttpStatus.CONFLICT, "")),
+                Symbol.fromText(command.symbol()).orElseThrow(
+                        () -> new ResponseStatusException(HttpStatus.CONFLICT, "Nie znaleziono takiego symbolu")),
                 command.przedmiotSprawy(),
                 command.dataPierwotnegoWplywu(),
                 command.dataWplywu()

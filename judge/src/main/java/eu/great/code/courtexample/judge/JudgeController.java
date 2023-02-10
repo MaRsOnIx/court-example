@@ -150,7 +150,8 @@ class JudgeController {
 
         if (judgeEntity.periodIsNewerThanPeriodOfNewestFunction(periodDate)) {
 
-            judgeEntity.assignCurrentFunction(periodDate, command.function(), new CurrentJudgeFunctionOverlappingPolicy())
+            judgeEntity.assignCurrentFunction(periodDate, command.function(),
+                            new CurrentJudgeFunctionOverlappingPolicy())
                     .getOrElseThrow(v -> new ResponseStatusException(HttpStatus.CONFLICT, v.message()));
 
             if (command.endDate() == null) {
@@ -160,7 +161,9 @@ class JudgeController {
                         FUNCTION_CONTEXT)
                 );
             } else {
-                kafkaTemplate.send(RESERVATION_TOPIC, new BecomeUnavailableAsDefaultCommand(Instant.now(), judgeEntity.toView().judgeUuid(), FUNCTION_CONTEXT));
+                kafkaTemplate.send(RESERVATION_TOPIC, new BecomeUnavailableAsDefaultCommand(Instant.now(),
+                        judgeEntity.toView().judgeUuid(),
+                        FUNCTION_CONTEXT));
                 kafkaTemplate.send(RESERVATION_TOPIC, new PeriodicallyReserveAvailabilityCommand(
                         Instant.now(),
                         judgeEntity.toView().judgeUuid(),
@@ -170,7 +173,8 @@ class JudgeController {
                 );
             }
         } else {
-            judgeEntity.assignHistoricalFunction(periodDate, command.function(), new HistoricalJudgeFunctionOverlappingPolicy())
+            judgeEntity.assignHistoricalFunction(periodDate, command.function(),
+                            new HistoricalJudgeFunctionOverlappingPolicy())
                     .getOrElseThrow(v -> new ResponseStatusException(HttpStatus.CONFLICT, v.message()));
         }
         kafkaTemplate.send(JUDGE_TOPIC, new JudgeUpdatedEvent(Instant.now(), judgeEntity.toView()));

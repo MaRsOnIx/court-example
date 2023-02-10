@@ -15,6 +15,8 @@ import java.util.*;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
+import static java.util.Comparator.comparing;
+
 @Document
 class SessionDayRoom {
     @Id
@@ -37,9 +39,12 @@ class SessionDayRoom {
 
     UUID defineNewTerm(PeriodTime periodTime){
         if(isOverlappingWithAnyTerm(periodTime)){
-            throw new IllegalStateException("Godziny: %s i %s nakładają się w tym samym czasie z innym terminem".formatted(periodTime.getBeginningDate(), periodTime.getEndDate()));
+            throw new IllegalStateException("Godziny: %s i %s nakładają się w tym samym czasie z innym terminem"
+                    .formatted(periodTime.getBeginningDate(), periodTime.getEndDate()));
         }
-        PeriodDateTime periodDateTime = PeriodDateTime.of(date.atTime(periodTime.getBeginningDate()), date.atTime(periodTime.getEndDate()));
+        PeriodDateTime periodDateTime = PeriodDateTime.of(
+                date.atTime(periodTime.getBeginningDate()),
+                date.atTime(periodTime.getEndDate()));
         Term term = new Term(periodDateTime);
         terms.put(term.getSnapshot().termUuid(), term);
         return term.getSnapshot().termUuid();
@@ -88,7 +93,7 @@ class SessionDayRoom {
                 .toList();
     }
 
-    DocketByJudge generateDocket(UUID judgeUuid){
+    Collection<DocketByJudge> generateDocket(UUID judgeUuid){
         return generateDocketByJudge(judgeUuid, findAllTerms());
     }
 
@@ -151,15 +156,15 @@ class SessionDayRoom {
         return findAllTerms().stream().filter(predicate).toList();
     }
 
-    DocketByJudge findDocketByJudge(UUID judgeUuid, List<Containing> containing, LogicalExpression logicalExpression){
+    Collection<DocketByJudge> findDocketByJudge(UUID judgeUuid, List<Containing> containing, LogicalExpression logicalExpression){
         List<TermSnapshot> termSnapshots = findFilteredTerms(containing, logicalExpression);
         return generateDocketByJudge(judgeUuid, termSnapshots);
     }
 
-    List<DocketByJudge> findAllDocketsByJudges(List<Containing> containing, LogicalExpression logicalExpression){
+    Collection<DocketByJudge> findAllDocketsByJudges(List<Containing> containing, LogicalExpression logicalExpression){
         List<TermSnapshot> termSnapshots = findFilteredTerms(containing, logicalExpression);
         List<JudgeChairperson> judges = termSnapshots.stream().map(TermSnapshot::chairPerson).distinct().toList();
-        return judges.stream().map(v -> generateDocketByJudge(v.judgeUuid(), termSnapshots)).toList();
+        return judges.stream().flatMap(v -> generateDocketByJudge(v.judgeUuid(), termSnapshots).stream()).toList();
     }
 
     private SessionDay generateSessionDay(Collection<TermSnapshot> terms){
@@ -168,18 +173,16 @@ class SessionDayRoom {
                 .collect(Collectors.toUnmodifiableSet());
 
         List<DocketByJudge> docketByJudges = judges.stream()
-                .map(v -> generateDocketByJudge(v.judgeUuid(), terms))
+                .flatMap(v -> generateDocketByJudge(v.judgeUuid(), terms).stream())
                 .toList();
 
         LocalTime dateFrom = docketByJudges.stream()
-                .filter(v -> !v.cancelled())
                 .map(DocketByJudge::period)
                 .map(PeriodTime::getBeginningDate)
                 .min(LocalTime::compareTo)
                 .orElseThrow(() -> new IllegalStateException("Brak aktywnych terminów"));
 
         LocalTime dateUntil = docketByJudges.stream()
-                .filter(v -> !v.cancelled())
                 .map(DocketByJudge::period)
                 .map(PeriodTime::getEndDate)
                 .max(LocalTime::compareTo)
@@ -188,36 +191,59 @@ class SessionDayRoom {
         return new SessionDay(dayPlanId, roomUuid, PeriodTime.of(dateFrom, dateUntil), date, docketsAreCancelled(docketByJudges), docketByJudges);
     }
 
-    private DocketByJudge generateDocketByJudge(UUID judgeUuid, Collection<TermSnapshot> terms){
+    private Collection<DocketByJudge> generateDocketByJudge(UUID judgeUuid, Collection<TermSnapshot> terms){
         List<TermSnapshot> termsForJudge = terms.stream()
                 .filter(v -> v.chairPerson().judgeUuid().equals(judgeUuid))
                 .toList();
 
         if(termsForJudge.isEmpty()){
-            throw new NoSuchElementException("Brak aktywnych terminów dla sędziego o identyfikatorze " + judgeUuid);
+            throw new NoSuchElementException("Brak aktywnych terminów dla sędziego o identyfikatorze "
+                    + judgeUuid);
         }
 
         JudgeChairperson judge = termsForJudge.stream().findFirst()
                 .map(TermSnapshot::chairPerson)
                 .orElseThrow();
 
-        LocalTime dateFrom = termsForJudge.stream()
-                .filter(TermSnapshot::prepared)
-                .filter(v -> !v.cancelled())
-                .map(TermSnapshot::periodTime)
-                .map(PeriodTime::getBeginningDate)
-                .min(LocalTime::compareTo)
-                .orElseThrow(() -> new IllegalStateException("Brak aktywnych terminów"));
+        List<DocketByJudge> dockets = new ArrayList<>();
+        List<TermSnapshot> termSnapshots = terms.stream()
+                .sorted(comparing(a -> a.periodTime().getBeginningDate()))
+                .filter(v -> v.chairPerson().judgeUuid().equals(judgeUuid))
+                .toList();
 
-        LocalTime dateUntil = termsForJudge.stream()
-                .filter(TermSnapshot::prepared)
-                .filter(v -> !v.cancelled())
-                .map(TermSnapshot::periodTime)
-                .map(PeriodTime::getEndDate)
-                .max(LocalTime::compareTo)
-                .orElseThrow(() -> new IllegalStateException("Brak aktywnych terminów"));
+        for (int i = 0 ; i < termSnapshots.size() ; i++) {
+            List<TermSnapshot> termsInDocket = new ArrayList<>();
+            TermSnapshot first = termSnapshots.get(i);
+            termsInDocket.add(first);
+            for (int j = i ; j < termSnapshots.size() ; j++) {
+                TermSnapshot next = termSnapshots.get(j);
+                if(!first.periodTime().getEndDate().equals(next.periodTime().getBeginningDate())){
+                    break;
+                }
+                termsInDocket.add(next);
+                i++;
+            }
 
-        return new DocketByJudge(dayPlanId, roomUuid, PeriodTime.of(dateFrom, dateUntil), date, judge, termsAreCancelled(termsForJudge), termsForJudge);
+            LocalTime dateFrom = termsInDocket.stream()
+                    .map(TermSnapshot::periodTime)
+                    .map(PeriodTime::getBeginningDate)
+                    .min(LocalTime::compareTo)
+                    .orElseThrow(() -> new IllegalStateException("Brak aktywnych terminów"));
+
+            LocalTime dateUntil = termsInDocket.stream()
+                    .map(TermSnapshot::periodTime)
+                    .map(PeriodTime::getEndDate)
+                    .max(LocalTime::compareTo)
+                    .orElseThrow(() -> new IllegalStateException("Brak aktywnych terminów"));
+
+            dockets.add(new DocketByJudge(dayPlanId, roomUuid,
+                    PeriodTime.of(dateFrom, dateUntil), date, judge,
+                    termsAreCancelled(termSnapshots), termSnapshots));
+
+        }
+
+
+        return dockets;
     }
 
 
@@ -282,16 +308,18 @@ class SessionDayRoom {
         protected Term(){}
 
         TermSnapshot getSnapshot(){
-            return new TermSnapshot(termUuid, prepared, cancelled, periodDateTime.toTime(), judges.stream().toList(), chairPerson);
+            return new TermSnapshot(termUuid, prepared, cancelled,
+                    periodDateTime.toTime(), judges.stream().toList(),
+                    chairPerson);
         }
-
-
         void assignJudges(Collection<JudgeView> judges){
             if(cancelled){
-                throw new IllegalStateException("Nie można przypisać sędziów, gdyż termin jest odwołany");
+                throw new IllegalStateException("Nie można przypisać sędziów," +
+                        " gdyż termin jest odwołany");
             }
             if(prepared){
-                throw new IllegalStateException("Nie można przypisać sędziów, gdyż termin jest już przygotowany");
+                throw new IllegalStateException("Nie można przypisać sędziów," +
+                        " gdyż termin jest już przygotowany");
             }
             List<Judge> judgesToSave = new ArrayList<>();
             for (JudgeView judge : judges) {

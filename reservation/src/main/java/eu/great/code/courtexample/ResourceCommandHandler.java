@@ -47,7 +47,8 @@ class ResourceCommandHandler {
 
     @Transactional
     public Result handle(PeriodicallyReserveAvailabilityCommand command){
-        Optional<Resource> optionalResource = resourceRepository.findResourceByResourceUUIDAndContext(command.resourceUuid(), command.context());
+        Optional<Resource> optionalResource = resourceRepository.findResourceByResourceUUIDAndContext(
+                command.resourceUuid(), command.context());
         if(optionalResource.isEmpty()){
             return Result.failure("Nie znaleziono zasobu");
         }

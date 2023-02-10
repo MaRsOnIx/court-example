@@ -40,8 +40,14 @@ class JudgeEntity {
         this.active = true;
     }
 
-    static JudgeEntity create(Fullname fullname, JudgeFunction function, LocalDate beginningDate, LocalDate endDate) {
-        return new JudgeEntity(fullname, Set.of(new FunctionHistory(function, PeriodDate.of(beginningDate, endDate))));
+    static JudgeEntity create(
+            Fullname fullname,
+            JudgeFunction function,
+            LocalDate beginningDate,
+            LocalDate endDate) {
+        return new JudgeEntity(fullname,
+                Set.of(new FunctionHistory(function, PeriodDate.of(beginningDate, endDate)))
+        );
     }
 
     @PersistenceCreator
@@ -155,7 +161,7 @@ class JudgeEntity {
                 .isEmpty();
     }
 
-    private List<JudgeFunctionHistoryView> getCurrentAndFutureFunctions(){
+    private List<JudgeFunctionHistoryView> getCurrentAndFutureFunctions() {
         return functionHistory.stream()
                 .filter(v -> v.getPeriod().getEndDate() == null || v.getPeriod().getEndDate().isBefore(LocalDate.now()))
                 .map(FunctionHistory::toView)
@@ -174,26 +180,32 @@ class JudgeEntity {
                 .toList();
     }
 
-    Either<Error, Void> assignCurrentFunction(PeriodDate periodDate, JudgeFunction function, JudgeFunctionOverlappingPolicy overlappingPolicy) {
+    Either<Error, Void> assignCurrentFunction(
+            PeriodDate periodDate,
+            JudgeFunction function,
+            JudgeFunctionOverlappingPolicy overlappingPolicy) {
         if (overlappingPolicy.anyFunctionPeriodOverlappingPeriod(findAllFunctions(), periodDate)) {
             return constructOverlappingError(periodDate, overlappingPolicy);
         }
         Optional<FunctionHistory> previousFunctionOfPeriod = findPreviousFunctionOfPeriod(periodDate);
         Optional<FunctionHistory> nextFunctionOfPeriod = findNextFunctionOfPeriod(periodDate);
 
-        if(nextFunctionOfPeriod.isPresent()){
-            return Either.left(of("Przypisywana funkcja nie może zostać dodana jako obecna, ponieważ istnieje nowsza funkcja"));
+        if (nextFunctionOfPeriod.isPresent()) {
+            return Either.left(of("Przypisywana funkcja nie może zostać dodana jako obecna," +
+                    " ponieważ istnieje nowsza funkcja"));
         }
 
         if (previousFunctionOfPeriod.isPresent()) {
             FunctionHistory history = previousFunctionOfPeriod.get();
             if (history.getFunction() == function) {
-                return Either.left(of("Sędzia nie może pełnić pod rząd tej samej funkcji, poprzednia funkcja: (%s)".formatted(history.toView().toReadableString())));
-            }else {
+                return Either.left(of("Sędzia nie może pełnić pod rząd tej samej funkcji, poprzednia funkcja: (%s)"
+                        .formatted(history.toView().toReadableString())));
+            } else {
                 Try<FunctionHistory> functionHistories = Try.of(() -> history)
                         .andThenTry(f -> f.updateEndDate(periodDate.getBeginningDate().minusDays(1)))
-                        .onSuccess(v -> logger.info("Funkcja o identyfikatorze %s została zaktualizowana (%s)".formatted(v.functionUuid, v.toView().toReadableString())));
-                if(functionHistories.isFailure()){
+                        .onSuccess(v -> logger.info("Funkcja o identyfikatorze %s została zaktualizowana (%s)"
+                                .formatted(v.functionUuid, v.toView().toReadableString())));
+                if (functionHistories.isFailure()) {
                     return Either.left(of(functionHistories.getCause().getMessage()));
                 }
             }
@@ -202,24 +214,31 @@ class JudgeEntity {
         return Either.right(null);
     }
 
-    Either<Error, Void> assignHistoricalFunction(PeriodDate periodDate, JudgeFunction function, JudgeFunctionOverlappingPolicy overlappingPolicy) {
+    Either<Error, Void> assignHistoricalFunction(
+            PeriodDate periodDate,
+            JudgeFunction function,
+            JudgeFunctionOverlappingPolicy overlappingPolicy) {
         if (overlappingPolicy.anyFunctionPeriodOverlappingPeriod(findAllFunctions(), periodDate)) {
             return constructOverlappingError(periodDate, overlappingPolicy);
         }
         Optional<FunctionHistory> previousFunctionOfPeriod = findPreviousFunctionOfPeriod(periodDate);
         Optional<FunctionHistory> nextFunctionOfPeriod = findNextFunctionOfPeriod(periodDate);
 
-        if(nextFunctionOfPeriod.isEmpty()){
-            return Either.left(of("Przypisywana funkcja nie może zostać dodana jako historyczna, ponieważ nowsza funkcja nie istnieje"));
+        if (nextFunctionOfPeriod.isEmpty()) {
+            return Either.left(of("Przypisywana funkcja nie może zostać dodana jako historyczna," +
+                    " ponieważ nowsza funkcja nie istnieje"));
         }
         if (previousFunctionOfPeriod.isPresent()) {
             FunctionHistory history = previousFunctionOfPeriod.get();
             if (history.getFunction() == function) {
-                return Either.left(of("Sędzia nie może pełnić pod rząd tej samej funkcji, poprzednia funkcja: (%s)".formatted(history.toView().toReadableString())));
+                return Either.left(of(("Sędzia nie może pełnić pod rząd tej samej funkcji," +
+                        " poprzednia funkcja: (%s)").formatted(history.toView().toReadableString())));
             }
         }
-        if(nextFunctionOfPeriod.get().getFunction() == function){
-            return Either.left(of("Sędzia nie może pełnić pod rząd tej samej funkcji, późniejsza funkcja: (%s)".formatted(nextFunctionOfPeriod.get().toView().toReadableString())));
+        if (nextFunctionOfPeriod.get().getFunction() == function) {
+            return Either.left(of(("Sędzia nie może pełnić pod rząd tej samej funkcji," +
+                    " późniejsza funkcja: (%s)")
+                    .formatted(nextFunctionOfPeriod.get().toView().toReadableString())));
         }
         functionHistory.add(new FunctionHistory(function, periodDate));
         return Either.right(null);

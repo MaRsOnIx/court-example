@@ -20,7 +20,7 @@ class ReservationCommandListener {
 
     @KafkaListener(topics = "reservation")
     void onCommand(ReservationCommand command){
-        logger.info("Handling command " + command.getClass().getSimpleName());
+        logger.info("Handling command {}", command.getClass().getSimpleName());
         switch (command){
             case BecomeAvailableAsDefaultCommand c -> logExecutor(() -> handler.handle(c));
             case BecomeUnavailableAsDefaultCommand c -> logExecutor(() -> handler.handle(c));

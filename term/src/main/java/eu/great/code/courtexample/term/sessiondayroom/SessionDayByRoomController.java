@@ -15,6 +15,7 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.time.Instant;
 import java.time.LocalDate;
+import java.util.Collection;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
@@ -35,7 +36,7 @@ class SessionDayByRoomController {
     }
 
     @GetMapping("sessionDay/all/today")
-    public List<SessionDayRoom.SessionDay> generateSessionDaysToday(GetSessionDaysToday query) {
+    public Collection<SessionDayRoom.SessionDay> generateSessionDaysToday(GetSessionDaysToday query) {
         return sessionDayForRoomRepository.findAllByDate(LocalDate.now())
                 .stream()
                 .map(v -> v.generateSessionDay(query.containing(), query.expression()))
@@ -43,7 +44,7 @@ class SessionDayByRoomController {
     }
 
     @GetMapping("sessionDay/all/byDate")
-    public List<SessionDayRoom.SessionDay> generateSessionDaysByDate(GetSessionDaysByDate query) {
+    public Collection<SessionDayRoom.SessionDay> generateSessionDaysByDate(GetSessionDaysByDate query) {
         return sessionDayForRoomRepository.findAllByDate(query.date())
                 .stream()
                 .map(v -> v.generateSessionDay(query.containing(), query.expression()))
@@ -51,7 +52,7 @@ class SessionDayByRoomController {
     }
 
     @GetMapping("sessionDay/all/inPeriod")
-    public List<SessionDayRoom.SessionDay> generateAllSessionDaysInPeriod(GetSessionDaysInPeriod query) {
+    public Collection<SessionDayRoom.SessionDay> generateAllSessionDaysInPeriod(GetSessionDaysInPeriod query) {
         PeriodDate period = PeriodDate.of(query.beginningDate(), query.endDate());
         return sessionDayForRoomRepository.findAllInPeriod(period.getBeginningDate(), period.getEndDate())
                 .stream()
@@ -84,7 +85,7 @@ class SessionDayByRoomController {
     }
 
     @GetMapping("docket")
-    public SessionDayRoom.DocketByJudge generateDocketByJudge(GetDocketByDateAndChairperson query) {
+    public Collection<SessionDayRoom.DocketByJudge> generateDocketByJudge(GetDocketByDateAndChairperson query) {
         return sessionDayForRoomRepository.findAllByDate(query.date()).stream()
                 .filter(v -> v.containsActiveChairPerson(query.chairpersonUuid()))
                 .findAny()

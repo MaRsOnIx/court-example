@@ -15,6 +15,7 @@ import java.time.Instant;
 @Transactional
 class RoomRepositoryListener extends AbstractRepositoryEventListener<Room> {
     private static final String RESERVATION_TOPIC = "reservation";
+    private static final String ROOM_TOPIC = "room";
     private static final String ROOM_CONTEXT = "room";
     private final Logger logger = LogManager.getLogger(RoomRepositoryListener.class);
 
@@ -29,8 +30,20 @@ class RoomRepositoryListener extends AbstractRepositoryEventListener<Room> {
     protected void onBeforeCreate(Room entity) {
         kafkaTemplate.executeInTransaction(t -> {
             RoomView roomView = toView(entity);
-            t.send(RESERVATION_TOPIC, new BecomeAvailableAsDefaultCommand(Instant.now(), roomView.roomUuid(), ROOM_CONTEXT));
-            logger.info(roomView + " created");
+            t.send(RESERVATION_TOPIC, new BecomeAvailableAsDefaultCommand(
+                    Instant.now(), roomView.roomUuid(), ROOM_CONTEXT));
+            t.send(ROOM_TOPIC, new RoomUpdatedEvent(Instant.now(), roomView));
+            logger.info("{} created", roomView);
+            return roomView;
+        });
+    }
+
+    @Override
+    protected void onBeforeSave(Room entity) {
+        kafkaTemplate.executeInTransaction(t -> {
+            RoomView roomView = toView(entity);
+            t.send(ROOM_TOPIC, new RoomUpdatedEvent(Instant.now(), roomView));
+            logger.info("{} updated", roomView);
             return roomView;
         });
     }
@@ -39,8 +52,10 @@ class RoomRepositoryListener extends AbstractRepositoryEventListener<Room> {
     protected void onBeforeDelete(Room entity) {
         kafkaTemplate.executeInTransaction(t -> {
             RoomView roomView = toView(entity);
-            t.send(RESERVATION_TOPIC, new BecomeUnavailableAsDefaultCommand(Instant.now(), roomView.roomUuid(), ROOM_CONTEXT));
-            logger.info(roomView + " deleted");
+            t.send(RESERVATION_TOPIC, new BecomeUnavailableAsDefaultCommand(
+                    Instant.now(), roomView.roomUuid(), ROOM_CONTEXT));
+            t.send(ROOM_TOPIC, new RoomDeletedEvent(Instant.now(), roomView.roomUuid()));
+            logger.info("{} deleted", roomView);
             return roomView;
         });
     }

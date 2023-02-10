@@ -27,7 +27,9 @@ class ResourceAvailableController {
     }
 
     @GetMapping("{context}/{resourceUuid}")
-    ResponseEntity<Void> isAvailable(@PathVariable("context") String context, @PathVariable("resourceUuid") UUID resourceUuid){
+    ResponseEntity<Void> isAvailable(
+            @PathVariable("context") String context,
+            @PathVariable("resourceUuid") UUID resourceUuid){
         Resource resource = resourceRepository.findResourceByResourceUUIDAndContext(resourceUuid, context)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Nie znaleziono zasobu"));
         return resource.isAvailable() ?
